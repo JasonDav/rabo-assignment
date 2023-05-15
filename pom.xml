@@ -47,10 +47,35 @@
 			<scope>runtime</scope>
 		</dependency>
 		<dependency>
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-core</artifactId>
+		</dependency>
+		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+
+		<!-- https://mvnrepository.com/artifact/org.apache.commons/commons-csv -->
+		<dependency>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-csv</artifactId>
+			<version>1.10.0</version>
+		</dependency>
+
+		<!-- https://github.com/marcwrobel/jbanking/tree/main -->
+		<!-- It's likely Rabo will have a library or system to do IBAN validation. -->
+		<dependency>
+			<groupId>fr.marcwrobel</groupId>
+			<artifactId>jbanking</artifactId>
+			<version>4.1.0</version>
+		</dependency>
+
 	</dependencies>
 
 	<build>

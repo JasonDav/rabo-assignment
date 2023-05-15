@@ -1,0 +1,39 @@
+-- Initial Schema
+-- Transaction reference
+--
+--
+-- A numeric value
+--
+-- Account number
+--
+--
+-- An IBAN
+--
+-- Start Balance
+--
+--
+-- The starting balance in Euros
+--
+-- Mutation
+--
+--
+-- Either an addition (+) or a deduction (-)
+--
+-- Description
+--
+--
+-- Free text
+--
+-- End Balance
+--
+--
+-- The end balance in Euros
+
+-- Modelled to match: https://www.ingwb.com/binaries/content/assets/support-content/payments-and-reporting/insidebusiness-payments/ing-format-description-mt940-swift-mt940---ibp-v1.0.pdf
+-- create table customer_statement (
+--     reference_number bigint primary key,
+--     account_number string not null,
+--     opening_balance decimal(12,4) not null,
+--     description string not null,
+--
+-- )
