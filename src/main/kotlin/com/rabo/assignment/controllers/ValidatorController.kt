@@ -12,29 +12,19 @@ import java.io.InputStreamReader
 
 
 @RestController
-@RequestMapping("/validator")
+@RequestMapping("/validators")
 class ValidatorController (
     val validatorService: ValidatorService
 ) {
 
 
     // TODO API Docs
-    // TODO Should the csv and xml endpoints be split?
-    @PostMapping("/file")
+    @PostMapping("/files")
     fun validateMT940(@RequestParam("file") file: MultipartFile?): ResponseEntity<Any> {
-        // Check if CSV or XML
         if (file == null || file.isEmpty) return ResponseEntity.badRequest().build()
-        val report = if (file.originalFilename?.endsWith(".csv") == true) {
-            validatorService.validateCSV(InputStreamReader(file.inputStream))
-        } else if (file.originalFilename?.endsWith(".xml") == true) {
-            validatorService.validateXML(file.inputStream)
-        } else {
-            // TODO maybe use Tika for filetype guessing?
-            null
-        }
 
-        // Return report on which are invalid
-        return ResponseEntity.ok(report)
+        val report = validatorService.validateFile(file)
+        return if (report != null) ResponseEntity.ok(report) else ResponseEntity.badRequest().build()
     }
 
     @PostMapping("/spring")

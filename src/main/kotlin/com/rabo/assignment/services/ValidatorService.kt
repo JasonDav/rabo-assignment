@@ -7,11 +7,13 @@ import org.apache.commons.csv.CSVFormat
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import org.springframework.web.multipart.MultipartFile
 import org.xml.sax.Attributes
 import org.xml.sax.SAXException
 import org.xml.sax.helpers.DefaultHandler
 import java.io.IOException
 import java.io.InputStream
+import java.io.InputStreamReader
 import java.io.Reader
 import java.math.BigDecimal
 import javax.xml.parsers.SAXParser
@@ -117,6 +119,17 @@ class ValidatorService() {
 
         // Validate reference duplicates
         return filterRecords(invalidRecords)
+    }
+
+    fun validateFile(file: MultipartFile): Map<String, MutableList<InvalidRecord>>? {
+        return if (file.originalFilename?.endsWith(".csv") == true) {
+            validateCSV(InputStreamReader(file.inputStream))
+        } else if (file.originalFilename?.endsWith(".xml") == true) {
+            validateXML(file.inputStream)
+        } else {
+            // TODO maybe use Tika for filetype guessing?
+            null
+        }
     }
 
 }
