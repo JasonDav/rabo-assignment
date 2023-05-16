@@ -20,6 +20,13 @@ import javax.xml.parsers.SAXParser
 import javax.xml.parsers.SAXParserFactory
 
 
+const val START_BALANCE_NULL = "Start Balance is null"
+const val END_BALANCE_NULL = "End Balance is null"
+const val IBAN_IS_NULL = "IBAN is null"
+
+private const val CSV_FILE_EXTENSION = ".csv"
+private const val XML_FILE_EXTENSION = ".xml"
+
 @Service
 class ValidatorService() {
 
@@ -77,12 +84,10 @@ class ValidatorService() {
 
     fun validateCSV(csvFile: Reader): Map<String, MutableList<InvalidRecord>> {
         val records = try { csvFormat.parse(csvFile) } catch (ioException: IOException) { logger.error(ioException.message); null } ?: throw ApplicationException.BadRequest("Could not parse file")
-        // In large files sequential lookups every iteration will be expensive and slow
         val invalidRecords: HashMap<String, MutableList<InvalidRecord>> = hashMapOf()
 
         // Perform Validation row-by-row
-        for (record in records) {
-
+        records.forEach { record ->
             // Validate Reference
             val reference = record[referenceHeader].toULongOrNull()?.toString()
             val invalidRecord = InvalidRecord(reference)
@@ -94,7 +99,7 @@ class ValidatorService() {
             val startBalance = record[startBalanceHeader].toBigDecimalOrNull()
             if (startBalance == null) {
                 //TODO errors should be constants
-                invalidRecord.addError("Start Balance is null")
+                invalidRecord.addError(START_BALANCE_NULL)
             }
 
             val mutation = validateMutation(record[mutationHeader], invalidRecord)
@@ -104,7 +109,7 @@ class ValidatorService() {
 
             val endBalance = record[endBalanceHeader].toBigDecimalOrNull()
             if (endBalance == null) {
-                invalidRecord.addError("End Balance is null")
+                invalidRecord.addError(END_BALANCE_NULL)
             }
 
             // Validate balance
@@ -122,17 +127,17 @@ class ValidatorService() {
     }
 
     fun validateFile(file: MultipartFile): Map<String, MutableList<InvalidRecord>>? {
-        return if (file.originalFilename?.endsWith(".csv") == true) {
+        return if (file.originalFilename?.endsWith(CSV_FILE_EXTENSION) == true) {
             validateCSV(InputStreamReader(file.inputStream))
-        } else if (file.originalFilename?.endsWith(".xml") == true) {
+        } else if (file.originalFilename?.endsWith(XML_FILE_EXTENSION) == true) {
             validateXML(file.inputStream)
         } else {
-            // TODO maybe use Tika for filetype guessing?
             null
         }
     }
 
 }
+
 
 /**
  * An IBAN consists of a two-letter ISO 3166-1 country code, followed by two check digits and up to thirty alphanumeric
@@ -151,7 +156,7 @@ fun validateIBAN(raw: String?, invalidRecord: ValidatorService.InvalidRecord) {
     } catch (e: IbanFormatException) {
         invalidRecord.addError("'$raw' is not a valid IBAN")
     } catch (e: IllegalArgumentException) {
-        invalidRecord.addError("IBAN is null")
+        invalidRecord.addError(IBAN_IS_NULL)
     }
 }
 
@@ -178,7 +183,7 @@ fun validateBalances(
 ) {
     if (startBalance != null && mutation != null && endBalance != null) {
         val calculatedBalance = startBalance.plus(mutation)
-        if (calculatedBalance != endBalance) {
+        if (calculatedBalance.compareTo(endBalance) != 0) {
             invalidRecord.addError("End balance is not correct: ($startBalance + $mutation) $calculatedBalance != $endBalance")
         }
     } else  {
@@ -187,9 +192,9 @@ fun validateBalances(
 }
 
 class RecordHandler : DefaultHandler() {
-    var logger: Logger = LoggerFactory.getLogger(this::class.java)
+    private var logger: Logger = LoggerFactory.getLogger(this::class.java)
 
-    var lastRecord: ValidatorService.InvalidRecord? = null
+    private var lastRecord: ValidatorService.InvalidRecord? = null
     val invalidRecords: HashMap<String, MutableList<ValidatorService.InvalidRecord>> = hashMapOf()
 
     private var startBalance: BigDecimal? = null
@@ -232,12 +237,12 @@ class RecordHandler : DefaultHandler() {
             ACCOUNT_NUMBER_HEADER -> validateIBAN(elementValue.toString(), lastRecord!!)
             START_BALANCE_HEADER -> {
                 startBalance = elementValue.toString().toBigDecimalOrNull()
-                startBalance ?: lastRecord?.addError("Start Balance is null")
+                startBalance ?: lastRecord?.addError(START_BALANCE_NULL)
             }
             MUTATION_HEADER -> mutation = validateMutation(elementValue.toString(), lastRecord!!)
             END_BALANCE_HEADER -> {
                 endBalance = elementValue.toString().toBigDecimalOrNull()
-                endBalance ?: lastRecord?.addError("End Balance is null")
+                endBalance ?: lastRecord?.addError(END_BALANCE_NULL)
             }
             RECORD -> {
                 if (lastRecord != null) {
