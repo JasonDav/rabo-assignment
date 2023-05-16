@@ -148,13 +148,13 @@ fun validateMutation(raw: String, invalidRecord: ValidatorService.InvalidRecord)
         return null
     }
     return when (raw.first()) {
-        '+', '-' -> raw.substring(1)
+        '+' -> raw.substring(1).toBigDecimalOrNull()
+        '-' -> raw.substring(1).toBigDecimalOrNull()?.negate()
         else -> {
             invalidRecord.addError("Mutation does not start with '+' or '-'")
-            raw
+            null
         }
-
-    }.toBigDecimalOrNull()
+    }
 }
 
 fun validateBalances(
