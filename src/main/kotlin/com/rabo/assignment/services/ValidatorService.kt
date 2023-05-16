@@ -13,9 +13,9 @@ import org.xml.sax.helpers.DefaultHandler
 import java.io.IOException
 import java.io.InputStream
 import java.io.Reader
+import java.math.BigDecimal
 import javax.xml.parsers.SAXParser
 import javax.xml.parsers.SAXParserFactory
-import kotlin.math.log
 
 
 @Service
@@ -38,13 +38,18 @@ class ValidatorService() {
 
         private val factory: SAXParserFactory = SAXParserFactory.newInstance()
         val saxParser: SAXParser = factory.newSAXParser()
-        val recordXMLHandler = RecordHandler()
     }
 
     class InvalidRecord(
         private val reference: String?,
     ) {
         val errors = mutableListOf<String>()
+
+        init {
+            if (reference?.toULongOrNull() == null) {
+                errors.add("Reference number is not valid: $reference")
+            }
+        }
 
         fun addError(error: String) = errors.add(error)
         override fun toString(): String {
@@ -53,9 +58,19 @@ class ValidatorService() {
 
     }
 
-    fun validateXML(inputStream: InputStream) {
-        saxParser.parse(inputStream, recordXMLHandler);
-        logger.debug(recordXMLHandler.records.toString())
+    /**
+     * Detect duplicate errors and remove non-error records.
+     */
+    private fun filterRecords(records: Map<String, MutableList<InvalidRecord>>): Map<String, MutableList<InvalidRecord>> {
+        records.filter { it.value.size > 1 }.forEach { it.value.forEach { error -> error.addError("Reference ${it.key} is duplicated.") } }
+        logger.debug(records.toString())
+        return records.filter { it.value.all { record -> record.errors.isNotEmpty() } }
+    }
+
+    fun validateXML(inputStream: InputStream):Map<String, MutableList<InvalidRecord>>  {
+        val recordXMLHandler = RecordHandler()
+        saxParser.parse(inputStream, recordXMLHandler)
+        return filterRecords(recordXMLHandler.invalidRecords)
     }
 
     fun validateCSV(csvFile: Reader): Map<String, MutableList<InvalidRecord>> {
@@ -65,30 +80,22 @@ class ValidatorService() {
 
         // Perform Validation row-by-row
         for (record in records) {
+
             // Validate Reference
-            // No assumption made on length of reference number
             val reference = record[referenceHeader].toULongOrNull()?.toString()
             val invalidRecord = InvalidRecord(reference)
 
             validateIBAN(record[accountNumberHeader], invalidRecord)
+
             // Assuming description can be null
-//            record[ValidatorService.descriptionHeader] ?: invalidRecord.addError("Description is null")
 
             val startBalance = record[startBalanceHeader].toBigDecimalOrNull()
             if (startBalance == null) {
+                //TODO errors should be constants
                 invalidRecord.addError("Start Balance is null")
             }
 
-            val mutation = record[mutationHeader]?.let {
-                when (it.first()) {
-                    '+', '-' -> it.substring(1)
-                    else -> {
-                        invalidRecord.addError("Mutation does not start with '+' or '-'")
-                        it
-                    }
-
-                }.toBigDecimalOrNull()
-            }
+            val mutation = validateMutation(record[mutationHeader], invalidRecord)
             if (mutation == null) {
                 invalidRecord.addError("Mutation is not a valid decimal value")
             }
@@ -99,12 +106,7 @@ class ValidatorService() {
             }
 
             // Validate balance
-            if (startBalance != null && mutation != null && endBalance != null) {
-                val calculatedBalance = startBalance.plus(mutation)
-                if (calculatedBalance != endBalance) {
-                    invalidRecord.addError("End balance is not correct: ($startBalance + $mutation) $calculatedBalance != $endBalance")
-                }
-            }
+            validateBalances(startBalance, mutation, endBalance, invalidRecord)
 
             if (invalidRecords.containsKey(reference)) {
                 invalidRecords[reference]?.add(invalidRecord)
@@ -114,66 +116,73 @@ class ValidatorService() {
         }
 
         // Validate reference duplicates
-        invalidRecords.filter { it.value.size > 1 }.forEach { it.value.forEach { error -> error.addError("Reference ${it.key} is duplicated.") } }
-        logger.debug(invalidRecords.toString())
-
-        // Return only records with errors
-        return invalidRecords.filter { it.value.all { record -> record.errors.isNotEmpty() } }
-    }
-
-    // Validate Reference number
-    // Check if type is correct
-    // TODO references cannot be negative or zero?
-    private fun validateRecordNumber(raw: String): ULong {
-        return raw.toULongOrNull() ?: throw ValidationException("Reference number is not a valid number")
-    }
-
-
-    /**
-     * An IBAN consists of a two-letter ISO 3166-1 country code, followed by two check digits and up to thirty alphanumeric
-     * characters for a BBAN (Basic Bank Account Number) which has a fixed length per country and, included within it, a bank
-     * identifier with a fixed position and a fixed length per country. The check digits are calculated based on the scheme defined
-     * in ISO/IEC 7064 (MOD97-10). Note that an IBAN is case-insensitive.
-     *
-     * <p>
-     * Specified by the <a href="https://www.iso13616.org">ISO 13616:2007 standard</a>.
-     */
-    private fun validateIBAN(raw: String?, invalidRecord: InvalidRecord) {
-        try {
-            // Something like https://www.swift.com/our-solutions/compliance-and-shared-services/swiftref/swiftref-payments-processing/payment-data-files/iban-plus?akcorpredir=true
-            // should be used to validate IBANS for now use a library.
-            Iban(raw)
-        } catch (e: IbanFormatException) {
-            invalidRecord.addError("$raw is not a valid IBAN")
-        } catch (e: IllegalArgumentException) {
-            invalidRecord.addError("IBAN is null")
-        }
+        return filterRecords(invalidRecords)
     }
 
 }
 
-class ValidationException(msg: String): RuntimeException(msg)
-
-
-class Record (
-    val reference: String? = null
-) {
-    var accountNumber: String? = null
-    var description: String? = null
-    var startBalance: String? = null
-    var mutation: String? = null
-    var endBalance: String? = null
-    override fun toString(): String {
-        return "Record(reference=$reference, accountNumber=$accountNumber, description=$description, startBalance=$startBalance, mutation=$mutation, endBalance=$endBalance)"
+/**
+ * An IBAN consists of a two-letter ISO 3166-1 country code, followed by two check digits and up to thirty alphanumeric
+ * characters for a BBAN (Basic Bank Account Number) which has a fixed length per country and, included within it, a bank
+ * identifier with a fixed position and a fixed length per country. The check digits are calculated based on the scheme defined
+ * in ISO/IEC 7064 (MOD97-10). Note that an IBAN is case-insensitive.
+ *
+ * <p>
+ * Specified by the <a href="https://www.iso13616.org">ISO 13616:2007 standard</a>.
+ */
+fun validateIBAN(raw: String?, invalidRecord: ValidatorService.InvalidRecord) {
+    try {
+        // Something like https://www.swift.com/our-solutions/compliance-and-shared-services/swiftref/swiftref-payments-processing/payment-data-files/iban-plus?akcorpredir=true
+        // should be used to validate IBANS for now use a library.
+        Iban(raw)
+    } catch (e: IbanFormatException) {
+        invalidRecord.addError("'$raw' is not a valid IBAN")
+    } catch (e: IllegalArgumentException) {
+        invalidRecord.addError("IBAN is null")
     }
+}
 
+fun validateMutation(raw: String, invalidRecord: ValidatorService.InvalidRecord): BigDecimal? {
+    if (raw.isEmpty()) {
+        invalidRecord.addError("Mutation is empty")
+        return null
+    }
+    return when (raw.first()) {
+        '+', '-' -> raw.substring(1)
+        else -> {
+            invalidRecord.addError("Mutation does not start with '+' or '-'")
+            raw
+        }
 
+    }.toBigDecimalOrNull()
+}
+
+fun validateBalances(
+    startBalance: BigDecimal?,
+    mutation: BigDecimal?,
+    endBalance: BigDecimal?,
+    invalidRecord: ValidatorService.InvalidRecord
+) {
+    if (startBalance != null && mutation != null && endBalance != null) {
+        val calculatedBalance = startBalance.plus(mutation)
+        if (calculatedBalance != endBalance) {
+            invalidRecord.addError("End balance is not correct: ($startBalance + $mutation) $calculatedBalance != $endBalance")
+        }
+    } else  {
+        invalidRecord.addError("End balance could not be calculated: Missing information.")
+    }
 }
 
 class RecordHandler : DefaultHandler() {
     var logger: Logger = LoggerFactory.getLogger(this::class.java)
 
-    val records = mutableListOf<Record>()
+    var lastRecord: ValidatorService.InvalidRecord? = null
+    val invalidRecords: HashMap<String, MutableList<ValidatorService.InvalidRecord>> = hashMapOf()
+
+    private var startBalance: BigDecimal? = null
+    private var mutation: BigDecimal? = null
+    private var endBalance: BigDecimal? = null
+
     private var elementValue: StringBuilder? = null
     @Throws(SAXException::class)
     override fun characters(ch: CharArray?, start: Int, length: Int) {
@@ -192,32 +201,40 @@ class RecordHandler : DefaultHandler() {
     @Throws(SAXException::class)
     override fun startElement(uri: String?, lName: String?, qName: String?, attr: Attributes?) {
         when (qName) {
-            // Levels
-            RECORDS -> logger.debug("Reading list of records")
-            RECORD -> records.add(Record(attr?.getValue(REFERENCE_HEADER)))
+            RECORD -> {
+                attr?.getValue(REFERENCE_HEADER).let {
+                    lastRecord = ValidatorService.InvalidRecord(it)
+                    invalidRecords[it]?.add(lastRecord!!) ?: invalidRecords.put(it ?: "null", mutableListOf(lastRecord!!))
+                }
+            }
 
             // Record fields
-            ACCOUNT_NUMBER_HEADER -> elementValue = StringBuilder()
-            DESCRIPTION_HEADER -> elementValue = StringBuilder()
-            START_BALANCE_HEADER -> elementValue = StringBuilder()
-            MUTATION_HEADER -> elementValue = StringBuilder()
-            END_BALANCE_HEADER -> elementValue = StringBuilder()
+            else -> elementValue = StringBuilder()
         }
     }
 
     @Throws(SAXException::class)
     override fun endElement(uri: String?, localName: String?, qName: String?) {
         when (qName) {
-            ACCOUNT_NUMBER_HEADER -> latestRecord().accountNumber = elementValue.toString()
-            DESCRIPTION_HEADER -> latestRecord().description = elementValue.toString()
-            START_BALANCE_HEADER -> latestRecord().startBalance = elementValue.toString()
-            MUTATION_HEADER -> latestRecord().mutation = elementValue.toString()
-            END_BALANCE_HEADER -> latestRecord().endBalance = elementValue.toString()
+            ACCOUNT_NUMBER_HEADER -> validateIBAN(elementValue.toString(), lastRecord!!)
+            START_BALANCE_HEADER -> {
+                startBalance = elementValue.toString().toBigDecimalOrNull()
+                startBalance ?: lastRecord?.addError("Start Balance is null")
+            }
+            MUTATION_HEADER -> mutation = validateMutation(elementValue.toString(), lastRecord!!)
+            END_BALANCE_HEADER -> {
+                endBalance = elementValue.toString().toBigDecimalOrNull()
+                endBalance ?: lastRecord?.addError("End Balance is null")
+            }
+            RECORD -> {
+                if (lastRecord != null) {
+                    validateBalances(startBalance, mutation, endBalance, lastRecord!!)
+                }
+                startBalance = null
+                mutation = null
+                endBalance = null
+            }
         }
-    }
-
-    private fun latestRecord(): Record {
-        return records.last()
     }
 
     companion object {

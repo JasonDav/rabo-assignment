@@ -25,9 +25,16 @@ class AssignmentApplicationTests @Autowired constructor(
 	private val validatorService: ValidatorService
 ) {
 
+	// TODO dockerfile
 
 	@Test
 	fun contextLoads() {
+	}
+
+	@Test
+	fun testUploadBadFileNameFile() {
+		val response = uploadFile("bad_file.bad")
+		println(response)
 	}
 
 	@Test
@@ -38,16 +45,7 @@ class AssignmentApplicationTests @Autowired constructor(
 
 	@Test
 	fun testUploadCSVFile() {
-		val headers = HttpHeaders()
-		headers.contentType = MediaType.MULTIPART_FORM_DATA
-
-		val csv = getFileResource("csv/records.csv")
-
-		val body: MultiValueMap<String, Any> = LinkedMultiValueMap()
-		body.add("file", csv)
-
-		val response = restTemplate
-			.postForEntity("/validator/file", HttpEntity(body, headers), String::class.java)
+		val response = uploadFile("csv/records.csv")
 		println(response)
 	}
 
@@ -59,6 +57,19 @@ class AssignmentApplicationTests @Autowired constructor(
 	@Test
 	fun shouldValidateCSV__Should_report_3_null_ibans() {
 		validatorService.validateCSV(getFile("csv/null_iban.csv").reader())
+	}
+
+	@Test
+	fun shouldValidateCSV__Should_survive_many_records() {
+		// TODO profile execution
+		// 20k records ~ 500ms = 0.025ms per record
+		validatorService.validateCSV(getFile("csv/many_records.csv").reader())
+	}
+
+	@Test
+	fun shouldValidateCSV__Should_error_on_bad_mutations() {
+		val validateCSV = validatorService.validateCSV(getFile("csv/bad_mutations.csv").reader())
+		// TODO assertions on errors in response
 	}
 
 	private fun uploadFile(path: String): ResponseEntity<String>? {
@@ -86,9 +97,4 @@ private fun getFile(path: String): File {
 
 private fun getFileResource(path: String): FileSystemResource {
 	return FileSystemResource(getPath(path))
-}
-
-
-private fun getFileBytes(path:String): ByteArray {
-	return Files.readAllBytes(getPath(path))
 }

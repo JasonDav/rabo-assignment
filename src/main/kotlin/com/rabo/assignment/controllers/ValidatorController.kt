@@ -17,14 +17,21 @@ class ValidatorController (
     val validatorService: ValidatorService
 ) {
 
+
+    // TODO API Docs
+    // TODO Should the csv and xml endpoints be split?
     @PostMapping("/file")
     fun validateMT940(@RequestParam("file") file: MultipartFile): ResponseEntity<Any> {
         // Check if CSV or XML
         if (file.isEmpty) return ResponseEntity.badRequest().build()
-
-        // Validate
-//        val report = validatorService.validateCSV(InputStreamReader(file.inputStream))
-        val report = validatorService.validateXML(file.inputStream)
+        val report = if (file.originalFilename?.endsWith(".csv") == true) {
+            validatorService.validateCSV(InputStreamReader(file.inputStream))
+        } else if (file.originalFilename?.endsWith(".xml") == true) {
+            validatorService.validateXML(file.inputStream)
+        } else {
+            // TODO maybe use Tika for filetype guessing?
+            null
+        }
 
         // Return report on which are invalid
         return ResponseEntity.ok(report)
