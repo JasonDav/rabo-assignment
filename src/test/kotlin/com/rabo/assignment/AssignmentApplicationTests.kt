@@ -25,8 +25,6 @@ class AssignmentApplicationTests @Autowired constructor(
 	private val validatorService: ValidatorService
 ) {
 
-	// TODO dockerfile
-
 	@Test
 	fun contextLoads() {
 	}
