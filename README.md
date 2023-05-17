@@ -45,3 +45,8 @@ Currently:
 | Class  | 66%      |
 | Method | 75%      |
 | Line   | 88%      |
+
+## Future Considerations
+* Automated testing pipeline.
+* Authentication mechanism should be implemented. Perhaps a long-lived token based auth.
+* Static code analysis before code merge to master.
