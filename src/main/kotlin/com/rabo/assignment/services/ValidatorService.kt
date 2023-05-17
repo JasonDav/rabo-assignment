@@ -110,7 +110,6 @@ class ValidatorService {
 
             val startBalance = record[startBalanceHeader].toBigDecimalOrNull()
             if (startBalance == null) {
-                //TODO errors should be constants
                 invalidRecord.addError(START_BALANCE_NULL)
             }
 
