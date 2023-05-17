@@ -31,3 +31,13 @@ _For full instructions see instructions/instructions.html_
 1. Run `docker build . -t rabo_mt940` to build the docker image.
 2. Run `docker run -p 8080:8080 --rm rabo_mt940` to run the application on port 8080.
 3. Run `curl -v -F file=@src/test/resources/csv/records.csv localhost:8080/validators/files` in a terminal to test the endpoint.
+
+## Coverage
+See htmlReport/index.html for test coverage results.\
+Currently:
+
+| Scope  | Coverage |
+|--------|----------|
+| Class  | 66%      |
+| Method | 75%      |
+| Line   | 88%      |

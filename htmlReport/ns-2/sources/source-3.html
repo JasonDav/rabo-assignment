@@ -1,0 +1,144 @@
+
+
+
+<!DOCTYPE html>
+<html id="htmlId">
+<head>
+  <title>Coverage Report > ValidatorController</title>
+  <style type="text/css">
+    @import "../../css/coverage.css";
+    @import "../../css/idea.min.css";
+  </style>
+  <script type="text/javascript" src="../../js/highlight.min.js"></script>
+  <script type="text/javascript" src="../../js/highlightjs-line-numbers.min.js"></script>
+</head>
+
+<body>
+<div class="content">
+<div class="breadCrumbs">
+Current scope:     <a href="../../index.html">all classes</a>
+    <span class="separator">|</span>
+    <a href="../index.html">com.rabo.assignment.controllers</a>
+</div>
+
+<h1>Coverage Summary for Class: ValidatorController (com.rabo.assignment.controllers)</h1>
+
+<table class="coverageStats">
+<tr>
+  <th class="name">Class</th>
+<th class="coverageStat 
+">
+  Class, %
+</th>
+<th class="coverageStat 
+">
+  Method, %
+</th>
+<th class="coverageStat 
+">
+  Line, %
+</th>
+</tr>
+<tr>
+  <td class="name">ValidatorController</td>
+<td class="coverageStat">
+  <span class="percent">
+    100%
+  </span>
+  <span class="absValue">
+    (1/1)
+  </span>
+</td>
+<td class="coverageStat">
+  <span class="percent">
+    100%
+  </span>
+  <span class="absValue">
+    (2/2)
+  </span>
+</td>
+<td class="coverageStat">
+  <span class="percent">
+    100%
+  </span>
+  <span class="absValue">
+    (5/5)
+  </span>
+</td>
+</tr>
+
+</table>
+
+<br/>
+<br/>
+
+
+<pre>
+<code class="sourceCode" id="sourceCode">&nbsp;package com.rabo.assignment.controllers
+&nbsp;
+&nbsp;import com.rabo.assignment.services.ValidatorService
+&nbsp;import org.springframework.core.annotation.Order
+&nbsp;import org.springframework.http.HttpStatus
+&nbsp;import org.springframework.http.ResponseEntity
+&nbsp;import org.springframework.web.bind.annotation.*
+&nbsp;import org.springframework.web.context.request.WebRequest
+&nbsp;import org.springframework.web.multipart.MultipartFile
+&nbsp;
+<b class="fc">&nbsp;@RestController</b>
+&nbsp;@RequestMapping(&quot;/validators&quot;)
+&nbsp;class ValidatorController (
+<b class="fc">&nbsp;    val validatorService: ValidatorService</b>
+&nbsp;) {
+&nbsp;
+&nbsp;    @PostMapping(&quot;/files&quot;)
+&nbsp;    fun validateMT940(@RequestParam(&quot;file&quot;) file: MultipartFile?): ResponseEntity&lt;Any&gt; {
+<b class="fc">&nbsp;        if (file == null || file.isEmpty) return ResponseEntity.badRequest().build()</b>
+&nbsp;
+<b class="fc">&nbsp;        val report = validatorService.validateFile(file)</b>
+<b class="fc">&nbsp;        return if (report != null) ResponseEntity.ok(report) else ResponseEntity.badRequest().build()</b>
+&nbsp;    }
+&nbsp;
+&nbsp;}
+&nbsp;
+&nbsp;sealed class ApplicationException(val status: Int = HttpStatus.BAD_REQUEST.value(), message: String?) : RuntimeException(message) {
+&nbsp;    constructor(status: HttpStatus, message: String?) : this(status.value(), message)
+&nbsp;
+&nbsp;    class BadRequest(message: String?): ApplicationException(HttpStatus.BAD_REQUEST, message)
+&nbsp;}
+&nbsp;
+&nbsp;@Order
+&nbsp;@RestControllerAdvice
+&nbsp;class RestExceptionHandler {
+&nbsp;
+&nbsp;    @ExceptionHandler(ApplicationException::class)
+&nbsp;    fun handleDomainExceptions(ex: ApplicationException, request: WebRequest): ResponseEntity&lt;String&gt; {
+&nbsp;        return ResponseEntity.status(ex.status).body(ex.message)
+&nbsp;    }
+&nbsp;}
+</code>
+</pre>
+</div>
+
+<script type="text/javascript">
+(function() {
+    var msie = false, msie9 = false;
+    /*@cc_on
+      msie = true;
+      @if (@_jscript_version >= 9)
+        msie9 = true;
+      @end
+    @*/
+
+    if (!msie || msie && msie9) {
+      hljs.highlightAll()
+      hljs.initLineNumbersOnLoad();
+    }
+})();
+</script>
+
+<div class="footer">
+    
+    <div style="float:right;">generated on 2023-05-17 07:45</div>
+</div>
+</body>
+</html>

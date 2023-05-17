@@ -1,0 +1,404 @@
+
+
+
+<!DOCTYPE html>
+<html id="htmlId">
+<head>
+  <title>Coverage Report > RecordHandler</title>
+  <style type="text/css">
+    @import "../../css/coverage.css";
+    @import "../../css/idea.min.css";
+  </style>
+  <script type="text/javascript" src="../../js/highlight.min.js"></script>
+  <script type="text/javascript" src="../../js/highlightjs-line-numbers.min.js"></script>
+</head>
+
+<body>
+<div class="content">
+<div class="breadCrumbs">
+Current scope:     <a href="../../index.html">all classes</a>
+    <span class="separator">|</span>
+    <a href="../index.html">com.rabo.assignment.services</a>
+</div>
+
+<h1>Coverage Summary for Class: RecordHandler (com.rabo.assignment.services)</h1>
+
+<table class="coverageStats">
+
+<tr>
+  <th class="name">Class</th>
+<th class="coverageStat 
+">
+  Method, %
+</th>
+<th class="coverageStat 
+">
+  Line, %
+</th>
+</tr>
+<tr>
+  <td class="name">RecordHandler</td>
+<td class="coverageStat">
+  <span class="percent">
+    100%
+  </span>
+  <span class="absValue">
+    (5/5)
+  </span>
+</td>
+<td class="coverageStat">
+  <span class="percent">
+    96%
+  </span>
+  <span class="absValue">
+    (24/25)
+  </span>
+</td>
+</tr>
+  <tr>
+    <td class="name">RecordHandler$Companion</td>
+<td class="coverageStat">
+  <span class="percent">
+    100%
+  </span>
+  <span class="absValue">
+    (1/1)
+  </span>
+</td>
+<td class="coverageStat">
+  <span class="percent">
+    100%
+  </span>
+  <span class="absValue">
+    (1/1)
+  </span>
+</td>
+  </tr>
+<tr>
+  <td class="name"><strong>Total</strong></td>
+<td class="coverageStat">
+  <span class="percent">
+    100%
+  </span>
+  <span class="absValue">
+    (6/6)
+  </span>
+</td>
+<td class="coverageStat">
+  <span class="percent">
+    96.2%
+  </span>
+  <span class="absValue">
+    (25/26)
+  </span>
+</td>
+</tr>
+</table>
+
+<br/>
+<br/>
+
+
+<pre>
+<code class="sourceCode" id="sourceCode">&nbsp;package com.rabo.assignment.services
+&nbsp;
+&nbsp;import com.rabo.assignment.controllers.ApplicationException
+&nbsp;import fr.marcwrobel.jbanking.iban.Iban
+&nbsp;import fr.marcwrobel.jbanking.iban.IbanFormatException
+&nbsp;import org.apache.commons.csv.CSVFormat
+&nbsp;import org.slf4j.Logger
+&nbsp;import org.slf4j.LoggerFactory
+&nbsp;import org.springframework.stereotype.Service
+&nbsp;import org.springframework.web.multipart.MultipartFile
+&nbsp;import org.xml.sax.Attributes
+&nbsp;import org.xml.sax.SAXException
+&nbsp;import org.xml.sax.helpers.DefaultHandler
+&nbsp;import java.io.IOException
+&nbsp;import java.io.InputStream
+&nbsp;import java.io.InputStreamReader
+&nbsp;import java.io.Reader
+&nbsp;import java.math.BigDecimal
+&nbsp;import javax.xml.parsers.SAXParser
+&nbsp;import javax.xml.parsers.SAXParserFactory
+&nbsp;
+&nbsp;
+&nbsp;const val START_BALANCE_NULL = &quot;Start Balance is null&quot;
+&nbsp;const val END_BALANCE_NULL = &quot;End Balance is null&quot;
+&nbsp;const val IBAN_IS_NULL = &quot;IBAN is null&quot;
+&nbsp;const val MUTATION_START_CHAR = &quot;Mutation does not start with &#39;+&#39; or &#39;-&#39;&quot;
+&nbsp;const val MUTATION_IS_EMPTY = &quot;Mutation is empty&quot;
+&nbsp;const val END_BALANCE_CALC_MISSING = &quot;End balance could not be calculated: Missing information.&quot;
+&nbsp;const val MUTATION_DECIMAL = &quot;Mutation is not a valid decimal value&quot;
+&nbsp;
+&nbsp;private const val CSV_FILE_EXTENSION = &quot;.csv&quot;
+&nbsp;private const val XML_FILE_EXTENSION = &quot;.xml&quot;
+&nbsp;
+&nbsp;
+&nbsp;@Service
+&nbsp;class ValidatorService() {
+&nbsp;
+&nbsp;    var logger: Logger = LoggerFactory.getLogger(this::class.java)
+&nbsp;
+&nbsp;    companion object {
+&nbsp;        const val referenceHeader = &quot;Reference&quot;
+&nbsp;        const val accountNumberHeader = &quot;Account Number&quot;
+&nbsp;        const val descriptionHeader = &quot;Description&quot;
+&nbsp;        const val startBalanceHeader = &quot;Start Balance&quot;
+&nbsp;        const val mutationHeader = &quot;Mutation&quot;
+&nbsp;        const val endBalanceHeader = &quot;End Balance&quot;
+&nbsp;
+&nbsp;        val csvFormat: CSVFormat = CSVFormat.DEFAULT.builder()
+&nbsp;            .setHeader(referenceHeader, accountNumberHeader, descriptionHeader, startBalanceHeader, mutationHeader, endBalanceHeader)
+&nbsp;            .setSkipHeaderRecord(true)
+&nbsp;            .build()
+&nbsp;
+&nbsp;        private val factory: SAXParserFactory = SAXParserFactory.newInstance()
+&nbsp;        val saxParser: SAXParser = factory.newSAXParser()
+&nbsp;    }
+&nbsp;
+&nbsp;    class InvalidRecord(
+&nbsp;        private val reference: String?,
+&nbsp;    ) {
+&nbsp;        val errors = mutableListOf&lt;String&gt;()
+&nbsp;
+&nbsp;        init {
+&nbsp;            if (reference?.toULongOrNull() == null) {
+&nbsp;                errors.add(&quot;Reference number is not valid: $reference&quot;)
+&nbsp;            }
+&nbsp;        }
+&nbsp;
+&nbsp;        fun addError(error: String) = errors.add(error)
+&nbsp;        override fun toString(): String {
+&nbsp;            return &quot;InvalidRecord(reference=$reference, errors=$errors)&quot;
+&nbsp;        }
+&nbsp;
+&nbsp;    }
+&nbsp;
+&nbsp;    /**
+&nbsp;     * Detect duplicate errors and remove non-error records.
+&nbsp;     */
+&nbsp;    private fun filterRecords(records: Map&lt;String, MutableList&lt;InvalidRecord&gt;&gt;): Map&lt;String, MutableList&lt;InvalidRecord&gt;&gt; {
+&nbsp;        records.filter { it.value.size &gt; 1 }.forEach { it.value.forEach { error -&gt; error.addError(&quot;Reference ${it.key} is duplicated.&quot;) } }
+&nbsp;        logger.debug(records.toString())
+&nbsp;        return records.filter { it.value.all { record -&gt; record.errors.isNotEmpty() } }
+&nbsp;    }
+&nbsp;
+&nbsp;    fun validateXML(inputStream: InputStream):Map&lt;String, MutableList&lt;InvalidRecord&gt;&gt;  {
+&nbsp;        val recordXMLHandler = RecordHandler()
+&nbsp;        saxParser.parse(inputStream, recordXMLHandler)
+&nbsp;        return filterRecords(recordXMLHandler.invalidRecords)
+&nbsp;    }
+&nbsp;
+&nbsp;    fun validateCSV(csvFile: Reader): Map&lt;String, MutableList&lt;InvalidRecord&gt;&gt; {
+&nbsp;        val records = try { csvFormat.parse(csvFile) } catch (ioException: IOException) { logger.error(ioException.message); null } ?: throw ApplicationException.BadRequest(&quot;Could not parse file&quot;)
+&nbsp;        val invalidRecords: HashMap&lt;String, MutableList&lt;InvalidRecord&gt;&gt; = hashMapOf()
+&nbsp;
+&nbsp;        // Perform Validation row-by-row
+&nbsp;        records.forEach { record -&gt;
+&nbsp;            // Validate Reference
+&nbsp;            val reference = record[referenceHeader].toULongOrNull()?.toString()
+&nbsp;            val invalidRecord = InvalidRecord(reference)
+&nbsp;
+&nbsp;            validateIBAN(record[accountNumberHeader], invalidRecord)
+&nbsp;
+&nbsp;            // Assuming description can be null
+&nbsp;
+&nbsp;            val startBalance = record[startBalanceHeader].toBigDecimalOrNull()
+&nbsp;            if (startBalance == null) {
+&nbsp;                //TODO errors should be constants
+&nbsp;                invalidRecord.addError(START_BALANCE_NULL)
+&nbsp;            }
+&nbsp;
+&nbsp;            val mutation = validateMutation(record[mutationHeader], invalidRecord)
+&nbsp;            if (mutation == null) {
+&nbsp;                invalidRecord.addError(MUTATION_DECIMAL)
+&nbsp;            }
+&nbsp;
+&nbsp;            val endBalance = record[endBalanceHeader].toBigDecimalOrNull()
+&nbsp;            if (endBalance == null) {
+&nbsp;                invalidRecord.addError(END_BALANCE_NULL)
+&nbsp;            }
+&nbsp;
+&nbsp;            // Validate balance
+&nbsp;            validateBalances(startBalance, mutation, endBalance, invalidRecord)
+&nbsp;
+&nbsp;            if (invalidRecords.containsKey(reference)) {
+&nbsp;                invalidRecords[reference]?.add(invalidRecord)
+&nbsp;            } else {
+&nbsp;                invalidRecords[reference!!] = mutableListOf(invalidRecord)
+&nbsp;            }
+&nbsp;        }
+&nbsp;
+&nbsp;        // Validate reference duplicates
+&nbsp;        return filterRecords(invalidRecords)
+&nbsp;    }
+&nbsp;
+&nbsp;    fun validateFile(file: MultipartFile): Map&lt;String, MutableList&lt;InvalidRecord&gt;&gt;? {
+&nbsp;        return if (file.originalFilename?.endsWith(CSV_FILE_EXTENSION) == true) {
+&nbsp;            validateCSV(InputStreamReader(file.inputStream))
+&nbsp;        } else if (file.originalFilename?.endsWith(XML_FILE_EXTENSION) == true) {
+&nbsp;            validateXML(file.inputStream)
+&nbsp;        } else {
+&nbsp;            null
+&nbsp;        }
+&nbsp;    }
+&nbsp;
+&nbsp;}
+&nbsp;
+&nbsp;
+&nbsp;/**
+&nbsp; * An IBAN consists of a two-letter ISO 3166-1 country code, followed by two check digits and up to thirty alphanumeric
+&nbsp; * characters for a BBAN (Basic Bank Account Number) which has a fixed length per country and, included within it, a bank
+&nbsp; * identifier with a fixed position and a fixed length per country. The check digits are calculated based on the scheme defined
+&nbsp; * in ISO/IEC 7064 (MOD97-10). Note that an IBAN is case-insensitive.
+&nbsp; *
+&nbsp; * &lt;p&gt;
+&nbsp; * Specified by the &lt;a href=&quot;https://www.iso13616.org&quot;&gt;ISO 13616:2007 standard&lt;/a&gt;.
+&nbsp; */
+&nbsp;fun validateIBAN(raw: String?, invalidRecord: ValidatorService.InvalidRecord) {
+&nbsp;    try {
+&nbsp;        // Something like https://www.swift.com/our-solutions/compliance-and-shared-services/swiftref/swiftref-payments-processing/payment-data-files/iban-plus?akcorpredir=true
+&nbsp;        // should be used to validate IBANS for now use a library.
+&nbsp;        Iban(raw)
+&nbsp;    } catch (e: IbanFormatException) {
+&nbsp;        invalidRecord.addError(&quot;&#39;$raw&#39; is not a valid IBAN&quot;)
+&nbsp;    } catch (e: IllegalArgumentException) {
+&nbsp;        invalidRecord.addError(IBAN_IS_NULL)
+&nbsp;    }
+&nbsp;}
+&nbsp;
+&nbsp;
+&nbsp;fun validateMutation(raw: String, invalidRecord: ValidatorService.InvalidRecord): BigDecimal? {
+&nbsp;    if (raw.isBlank()) {
+&nbsp;        invalidRecord.addError(MUTATION_IS_EMPTY)
+&nbsp;        return null
+&nbsp;    }
+&nbsp;    return when (raw.first()) {
+&nbsp;        &#39;+&#39; -&gt; raw.substring(1).toBigDecimalOrNull()
+&nbsp;        &#39;-&#39; -&gt; raw.substring(1).toBigDecimalOrNull()?.negate()
+&nbsp;        else -&gt; {
+&nbsp;            invalidRecord.addError(MUTATION_START_CHAR)
+&nbsp;            null
+&nbsp;        }
+&nbsp;    }
+&nbsp;}
+&nbsp;
+&nbsp;fun validateBalances(
+&nbsp;    startBalance: BigDecimal?,
+&nbsp;    mutation: BigDecimal?,
+&nbsp;    endBalance: BigDecimal?,
+&nbsp;    invalidRecord: ValidatorService.InvalidRecord
+&nbsp;) {
+&nbsp;    if (startBalance != null &amp;&amp; mutation != null &amp;&amp; endBalance != null) {
+&nbsp;        val calculatedBalance = startBalance.plus(mutation)
+&nbsp;        if (calculatedBalance.compareTo(endBalance) != 0) {
+&nbsp;            invalidRecord.addError(&quot;End balance is not correct: ($startBalance + $mutation) $calculatedBalance != $endBalance&quot;)
+&nbsp;        }
+&nbsp;    } else  {
+&nbsp;        invalidRecord.addError(END_BALANCE_CALC_MISSING)
+&nbsp;    }
+&nbsp;}
+&nbsp;
+<b class="fc">&nbsp;class RecordHandler : DefaultHandler() {</b>
+<b class="fc">&nbsp;    private var logger: Logger = LoggerFactory.getLogger(this::class.java)</b>
+&nbsp;
+&nbsp;    private var lastRecord: ValidatorService.InvalidRecord? = null
+<b class="fc">&nbsp;    val invalidRecords: HashMap&lt;String, MutableList&lt;ValidatorService.InvalidRecord&gt;&gt; = hashMapOf()</b>
+&nbsp;
+&nbsp;    private var startBalance: BigDecimal? = null
+&nbsp;    private var mutation: BigDecimal? = null
+&nbsp;    private var endBalance: BigDecimal? = null
+&nbsp;
+&nbsp;    private var elementValue: StringBuilder? = null
+&nbsp;    @Throws(SAXException::class)
+&nbsp;    override fun characters(ch: CharArray?, start: Int, length: Int) {
+<b class="fc">&nbsp;        if (elementValue == null) {</b>
+<b class="nc">&nbsp;            elementValue = StringBuilder()</b>
+&nbsp;        } else {
+<b class="fc">&nbsp;            elementValue!!.appendRange(ch!!, start, start + length)</b>
+&nbsp;        }
+&nbsp;    }
+&nbsp;
+&nbsp;    @Throws(SAXException::class)
+&nbsp;    override fun startDocument() {
+<b class="fc">&nbsp;        logger.debug(&quot;Starting document read&quot;)</b>
+&nbsp;    }
+&nbsp;
+&nbsp;    @Throws(SAXException::class)
+&nbsp;    override fun startElement(uri: String?, lName: String?, qName: String?, attr: Attributes?) {
+<b class="fc">&nbsp;        when (qName) {</b>
+<b class="fc">&nbsp;            RECORD -&gt; {</b>
+<b class="fc">&nbsp;                attr?.getValue(REFERENCE_HEADER).let {</b>
+<b class="fc">&nbsp;                    lastRecord = ValidatorService.InvalidRecord(it)</b>
+<b class="fc">&nbsp;                    invalidRecords[it]?.add(lastRecord!!) ?: invalidRecords.put(it ?: &quot;null&quot;, mutableListOf(lastRecord!!))</b>
+&nbsp;                }
+&nbsp;            }
+&nbsp;
+&nbsp;            // Record fields
+<b class="fc">&nbsp;            else -&gt; elementValue = StringBuilder()</b>
+&nbsp;        }
+&nbsp;    }
+&nbsp;
+&nbsp;    @Throws(SAXException::class)
+&nbsp;    override fun endElement(uri: String?, localName: String?, qName: String?) {
+<b class="fc">&nbsp;        when (qName) {</b>
+<b class="fc">&nbsp;            ACCOUNT_NUMBER_HEADER -&gt; validateIBAN(elementValue.toString(), lastRecord!!)</b>
+&nbsp;            START_BALANCE_HEADER -&gt; {
+<b class="fc">&nbsp;                startBalance = elementValue.toString().toBigDecimalOrNull()</b>
+<b class="fc">&nbsp;                startBalance ?: lastRecord?.addError(START_BALANCE_NULL)</b>
+&nbsp;            }
+<b class="fc">&nbsp;            MUTATION_HEADER -&gt; mutation = validateMutation(elementValue.toString(), lastRecord!!)</b>
+&nbsp;            END_BALANCE_HEADER -&gt; {
+<b class="fc">&nbsp;                endBalance = elementValue.toString().toBigDecimalOrNull()</b>
+<b class="fc">&nbsp;                endBalance ?: lastRecord?.addError(END_BALANCE_NULL)</b>
+&nbsp;            }
+&nbsp;            RECORD -&gt; {
+<b class="fc">&nbsp;                if (lastRecord != null) {</b>
+<b class="fc">&nbsp;                    validateBalances(startBalance, mutation, endBalance, lastRecord!!)</b>
+&nbsp;                }
+<b class="fc">&nbsp;                startBalance = null</b>
+<b class="fc">&nbsp;                mutation = null</b>
+<b class="fc">&nbsp;                endBalance = null</b>
+&nbsp;            }
+&nbsp;        }
+&nbsp;    }
+&nbsp;
+<b class="fc">&nbsp;    companion object {</b>
+&nbsp;        private const val RECORDS = &quot;records&quot;
+&nbsp;        private const val RECORD = &quot;record&quot;
+&nbsp;
+&nbsp;        private const val REFERENCE_HEADER = &quot;reference&quot;
+&nbsp;        private const val ACCOUNT_NUMBER_HEADER = &quot;accountNumber&quot;
+&nbsp;        private const val DESCRIPTION_HEADER = &quot;description&quot;
+&nbsp;        private const val START_BALANCE_HEADER = &quot;startBalance&quot;
+&nbsp;        private const val MUTATION_HEADER = &quot;mutation&quot;
+&nbsp;        private const val END_BALANCE_HEADER = &quot;endBalance&quot;
+&nbsp;    }
+&nbsp;}
+</code>
+</pre>
+</div>
+
+<script type="text/javascript">
+(function() {
+    var msie = false, msie9 = false;
+    /*@cc_on
+      msie = true;
+      @if (@_jscript_version >= 9)
+        msie9 = true;
+      @end
+    @*/
+
+    if (!msie || msie && msie9) {
+      hljs.highlightAll()
+      hljs.initLineNumbersOnLoad();
+    }
+})();
+</script>
+
+<div class="footer">
+    
+    <div style="float:right;">generated on 2023-05-17 07:45</div>
+</div>
+</body>
+</html>
