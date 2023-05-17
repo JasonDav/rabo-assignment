@@ -1,0 +1,6 @@
+style:
+  MaxLineLength:
+    active: false
+
+console-reports:
+  active: true

@@ -26,9 +26,6 @@ class AssignmentApplicationTests @Autowired constructor(
 ) {
 
 	@Test
-	fun contextLoads() {}
-
-	@Test
 	fun testUploadBadFileNameFile() {
 		val response = uploadFile("bad_file.bad")
 		assert(response?.statusCode == HttpStatus.BAD_REQUEST)

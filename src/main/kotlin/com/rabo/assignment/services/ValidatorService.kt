@@ -33,7 +33,7 @@ private const val XML_FILE_EXTENSION = ".xml"
 
 
 @Service
-class ValidatorService() {
+class ValidatorService {
 
     var logger: Logger = LoggerFactory.getLogger(this::class.java)
 
@@ -46,7 +46,14 @@ class ValidatorService() {
         const val endBalanceHeader = "End Balance"
 
         val csvFormat: CSVFormat = CSVFormat.DEFAULT.builder()
-            .setHeader(referenceHeader, accountNumberHeader, descriptionHeader, startBalanceHeader, mutationHeader, endBalanceHeader)
+            .setHeader(
+                referenceHeader,
+                accountNumberHeader,
+                descriptionHeader,
+                startBalanceHeader,
+                mutationHeader,
+                endBalanceHeader
+            )
             .setSkipHeaderRecord(true)
             .build()
 
@@ -262,12 +269,10 @@ class RecordHandler : DefaultHandler() {
     }
 
     companion object {
-        private const val RECORDS = "records"
         private const val RECORD = "record"
 
         private const val REFERENCE_HEADER = "reference"
         private const val ACCOUNT_NUMBER_HEADER = "accountNumber"
-        private const val DESCRIPTION_HEADER = "description"
         private const val START_BALANCE_HEADER = "startBalance"
         private const val MUTATION_HEADER = "mutation"
         private const val END_BALANCE_HEADER = "endBalance"

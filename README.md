@@ -46,6 +46,27 @@ Currently:
 | Method | 75%      |
 | Line   | 88%      |
 
+## Code Analysis
+Complexity Report:
+- 445 lines of code (loc)
+- 345 source lines of code (sloc)
+- 247 logical lines of code (lloc)
+- 22 comment lines of code (cloc)
+- 68 cyclomatic complexity (mcc)
+- 32 cognitive complexity
+- 0 number of total code smells
+- 6% comment source ratio
+- 275 mcc per 1,000 lloc
+- 0 code smells per 1,000 lloc
+
+Project Statistics:
+- number of properties: 52
+- number of functions: 29
+- number of classes: 9
+- number of packages: 3
+- number of kt files: 4
+
+
 ## Future Considerations
 * Automated testing pipeline.
 * Authentication mechanism should be implemented. Perhaps a long-lived token based auth.
