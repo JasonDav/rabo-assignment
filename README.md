@@ -32,6 +32,10 @@ _For full instructions see instructions/instructions.html_
 2. Run `docker run -p 8080:8080 --rm rabo_mt940` to run the application on port 8080.
 3. Run `curl -v -F file=@src/test/resources/csv/records.csv localhost:8080/validators/files` in a terminal to test the endpoint.
 
+### Maven
+1. Run `mvn clean package` in the root directory.
+2. Run `java -jar target/assignment-0.0.1-SNAPSHOT.jar`. This requires you have the java binary on your path.
+
 ## Coverage
 See htmlReport/index.html for test coverage results.\
 Currently:
