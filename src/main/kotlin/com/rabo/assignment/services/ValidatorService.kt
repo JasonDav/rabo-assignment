@@ -23,9 +23,14 @@ import javax.xml.parsers.SAXParserFactory
 const val START_BALANCE_NULL = "Start Balance is null"
 const val END_BALANCE_NULL = "End Balance is null"
 const val IBAN_IS_NULL = "IBAN is null"
+const val MUTATION_START_CHAR = "Mutation does not start with '+' or '-'"
+const val MUTATION_IS_EMPTY = "Mutation is empty"
+const val END_BALANCE_CALC_MISSING = "End balance could not be calculated: Missing information."
+const val MUTATION_DECIMAL = "Mutation is not a valid decimal value"
 
 private const val CSV_FILE_EXTENSION = ".csv"
 private const val XML_FILE_EXTENSION = ".xml"
+
 
 @Service
 class ValidatorService() {
@@ -104,7 +109,7 @@ class ValidatorService() {
 
             val mutation = validateMutation(record[mutationHeader], invalidRecord)
             if (mutation == null) {
-                invalidRecord.addError("Mutation is not a valid decimal value")
+                invalidRecord.addError(MUTATION_DECIMAL)
             }
 
             val endBalance = record[endBalanceHeader].toBigDecimalOrNull()
@@ -160,16 +165,17 @@ fun validateIBAN(raw: String?, invalidRecord: ValidatorService.InvalidRecord) {
     }
 }
 
+
 fun validateMutation(raw: String, invalidRecord: ValidatorService.InvalidRecord): BigDecimal? {
-    if (raw.isEmpty()) {
-        invalidRecord.addError("Mutation is empty")
+    if (raw.isBlank()) {
+        invalidRecord.addError(MUTATION_IS_EMPTY)
         return null
     }
     return when (raw.first()) {
         '+' -> raw.substring(1).toBigDecimalOrNull()
         '-' -> raw.substring(1).toBigDecimalOrNull()?.negate()
         else -> {
-            invalidRecord.addError("Mutation does not start with '+' or '-'")
+            invalidRecord.addError(MUTATION_START_CHAR)
             null
         }
     }
@@ -187,7 +193,7 @@ fun validateBalances(
             invalidRecord.addError("End balance is not correct: ($startBalance + $mutation) $calculatedBalance != $endBalance")
         }
     } else  {
-        invalidRecord.addError("End balance could not be calculated: Missing information.")
+        invalidRecord.addError(END_BALANCE_CALC_MISSING)
     }
 }
 

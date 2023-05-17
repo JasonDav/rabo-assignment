@@ -1,6 +1,6 @@
 package com.rabo.assignment
 
-import com.rabo.assignment.services.ValidatorService
+import com.rabo.assignment.services.*
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -68,9 +68,22 @@ class AssignmentApplicationTests @Autowired constructor(
 	@Test
 	fun shouldValidateCSV__Should_error_on_bad_mutations() {
 		val report = validatorService.validateCSV(getFile("csv/bad_mutations.csv").reader())
-		assert(report.any { it.value.any { record -> record.errors.any { error -> error.contains("Mutation is not a valid decimal value") } } })
-		assert(report.any { it.value.any { record -> record.errors.any { error -> error.contains("Mutation does not start with '+' or '-'") } } })
-		assert(report.any { it.value.any { record -> record.errors.any { error -> error.contains("End balance could not be calculated: Missing information.") } } })
+		assert(reportContains(report, MUTATION_DECIMAL))
+		assert(reportContains(report, MUTATION_START_CHAR))
+		assert(reportContains(report, MUTATION_IS_EMPTY))
+		assert(reportContains(report, END_BALANCE_CALC_MISSING))
+	}
+
+	@Test
+	fun shouldValidateCSV__Should_error_on_bad_start_end_values() {
+		val report = validatorService.validateCSV(getFile("csv/bad_mutations.csv").reader())
+		assert(reportContains(report, START_BALANCE_NULL))
+		assert(reportContains(report,"End balance is not correct"))
+		assert(reportContains(report, END_BALANCE_CALC_MISSING))
+	}
+
+	private fun reportContains(report: Map<String, MutableList<ValidatorService.InvalidRecord>>, value: String): Boolean {
+		return report.any { it.value.any { record -> record.errors.any { error -> error.contains(value) } } }
 	}
 
 	private fun uploadFile(path: String): ResponseEntity<String>? {
